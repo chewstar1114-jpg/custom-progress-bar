@@ -185,12 +185,12 @@ protected:
     }
 
     void onDone(CCObject*) {
-        this->onClose();
+        this->onClose(nullptr);
     }
 
     void onCancel(CCObject*) {
         if (m_callback) m_callback(m_original); // 원래 색으로 되돌림
-        this->onClose();
+        this->onClose(nullptr);
     }
 
 public:
