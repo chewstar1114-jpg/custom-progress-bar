@@ -8,9 +8,9 @@
 //  - 가운데 세로 막대: 색상(Hue) (드래그)
 //  - 오른쪽: 새 색 / 원래 색 미리보기 + HEX 값
 //  색을 움직이는 동안 콜백이 계속 호출되어 실시간으로 반영됩니다.
-class PaintPickerPopup : public geode::Popup<ccColor3B, std::function<void(ccColor3B)>> {
+class PaintPickerPopup : public geode::Popup {
 protected:
-    using Base = geode::Popup<ccColor3B, std::function<void(ccColor3B)>>;
+    using Base = geode::Popup;
 
     static constexpr float PAD = 160.f;     // 사각형 한 변
     static constexpr float PAD_X = 20.f;
@@ -29,7 +29,9 @@ protected:
     float m_h = 0.f, m_s = 1.f, m_v = 1.f;
     int m_drag = 0; // 0 = 없음, 1 = 사각형, 2 = 색상 막대
 
-    bool setup(ccColor3B color, std::function<void(ccColor3B)> cb) override {
+    bool init(ccColor3B color, std::function<void(ccColor3B)> cb) {
+        if (!Popup::init(320.f, 268.f)) return false;
+
         m_original = color;
         m_callback = std::move(cb);
         auto hsv = studio::rgb2hsv(color);
@@ -183,18 +185,18 @@ protected:
     }
 
     void onDone(CCObject*) {
-        this->onClose(nullptr);
+        this->onClose();
     }
 
     void onCancel(CCObject*) {
         if (m_callback) m_callback(m_original); // 원래 색으로 되돌림
-        this->onClose(nullptr);
+        this->onClose();
     }
 
 public:
     static PaintPickerPopup* create(ccColor3B color, std::function<void(ccColor3B)> cb) {
         auto ret = new PaintPickerPopup();
-        if (ret && ret->initAnchored(320.f, 268.f, color, std::move(cb))) {
+        if (ret && ret->init(color, std::move(cb))) {
             ret->autorelease();
             return ret;
         }

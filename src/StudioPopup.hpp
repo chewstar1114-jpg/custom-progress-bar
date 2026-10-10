@@ -5,7 +5,7 @@
 
 // 프리셋 리스트: [이름] [바 미리보기] [BG 색] [BAR 색] [Select]
 // BG / BAR 스와치를 누르면 그림판 스타일 드래그 피커가 열립니다.
-class StudioPopup : public geode::Popup<> {
+class StudioPopup : public geode::Popup {
 protected:
     struct Row {
         CCScale9Sprite* bg = nullptr;
@@ -25,7 +25,9 @@ protected:
         return { x - m_size.width / 2.f, y - m_size.height / 2.f };
     }
 
-    bool setup() override {
+    bool init() {
+        if (!Popup::init(360.f, 262.f)) return false;
+
         this->setTitle("Progress Bar Studio");
 
         const float W = m_size.width;
@@ -125,7 +127,7 @@ protected:
 public:
     static StudioPopup* create() {
         auto ret = new StudioPopup();
-        if (ret && ret->initAnchored(360.f, 262.f)) {
+        if (ret && ret->init()) {
             ret->autorelease();
             return ret;
         }
