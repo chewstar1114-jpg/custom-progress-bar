@@ -8,9 +8,9 @@
 class StudioPopup : public geode::Popup {
 protected:
     struct Row {
-        CCScale9Sprite* bg = nullptr;
-        CCScale9Sprite* trackSwatch = nullptr;
-        CCScale9Sprite* barSwatch = nullptr;
+        CCLayerColor* bg = nullptr;
+        CCLayerColor* trackSwatch = nullptr;
+        CCLayerColor* barSwatch = nullptr;
         CCDrawNode* preview = nullptr;
         ButtonSprite* selectBtn = nullptr;
     };
@@ -39,10 +39,11 @@ protected:
             float cy = H - 52.f - rowH / 2.f - i * (rowH + gap);
             auto& row = m_rows[i];
 
-            // 행 배경
-            row.bg = CCScale9Sprite::create("square02_001.png");
-            row.bg->setContentSize({ W - 24.f, rowH });
-            m_mainLayer->addChildAtPosition(row.bg, Anchor::Center, ctr(W / 2.f, cy), false);
+            // 행 배경 (단색 레이어: 색이 그대로 보임)
+            row.bg = CCLayerColor::create(ccc4(38, 43, 58, 255), W - 24.f, rowH);
+            m_mainLayer->addChildAtPosition(
+                row.bg, Anchor::Center, ctr(12.f, cy - rowH / 2.f), false
+            );
 
             // 프리셋 이름 (고정)
             auto name = CCLabelBMFont::create(studio::defaults()[i].name, "bigFont.fnt");
@@ -55,8 +56,8 @@ protected:
             m_mainLayer->addChildAtPosition(row.preview, Anchor::Center, ctr(24.f, cy - 18.f), false);
 
             // BG / BAR 색상 스와치
-            addSwatch(row.trackSwatch, "BG",  W - 112.f, W - 90.f, cy - 14.f, i * 10 + 0);
-            addSwatch(row.barSwatch,   "BAR", W - 62.f,  W - 38.f, cy - 14.f, i * 10 + 1);
+            addSwatch(row.trackSwatch, "BG",  W - 112.f, W - 88.f, cy - 14.f, i * 10 + 0);
+            addSwatch(row.barSwatch,   "BAR", W - 62.f,  W - 36.f, cy - 14.f, i * 10 + 1);
 
             // Select 버튼 (고정)
             row.selectBtn = ButtonSprite::create("Select");
@@ -72,14 +73,24 @@ protected:
         return true;
     }
 
-    void addSwatch(CCScale9Sprite*& out, char const* text, float labelX, float swatchX, float y, int tag) {
+    // 흰 테두리 + 안쪽 단색: 어떤 색이든 눈에 잘 보이는 스와치
+    void addSwatch(CCLayerColor*& inner, char const* text, float labelX, float swatchX, float y, int tag) {
         auto label = CCLabelBMFont::create(text, "bigFont.fnt");
         label->setScale(0.28f);
         m_mainLayer->addChildAtPosition(label, Anchor::Center, ctr(labelX, y), false);
 
-        out = CCScale9Sprite::create("square02_001.png");
-        out->setContentSize({ 24.f, 16.f });
-        auto btn = CCMenuItemSpriteExtra::create(out, this, menu_selector(StudioPopup::onSwatch));
+        auto holder = CCNode::create();
+        holder->setContentSize({ 30.f, 22.f });
+        holder->setAnchorPoint({ 0.5f, 0.5f });
+
+        auto border = CCLayerColor::create(ccc4(255, 255, 255, 255), 30.f, 22.f);
+        holder->addChild(border, 0);
+
+        inner = CCLayerColor::create(ccc4(0, 0, 0, 255), 26.f, 18.f);
+        inner->setPosition({ 2.f, 2.f });
+        holder->addChild(inner, 1);
+
+        auto btn = CCMenuItemSpriteExtra::create(holder, this, menu_selector(StudioPopup::onSwatch));
         btn->setTag(tag);
         m_buttonMenu->addChildAtPosition(btn, Anchor::Center, ctr(swatchX, y), false);
     }

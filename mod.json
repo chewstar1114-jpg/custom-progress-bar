@@ -6,33 +6,23 @@
   },
   "id": "yourname.custom-progress-bar",
   "name": "Custom Progress Bar",
-  "version": "v1.2.0",
+  "version": "v1.3.0",
   "developer": "yourname",
-  "description": "Progress Bar Studio: 프리셋 선택 + 그림판 스타일 드래그 색 선택(배경/바). 메인 메뉴 하단의 'Bar' 버튼으로 엽니다.",
+  "description": "Progress Bar Studio: 프리셋 선택 + 그림판 스타일 드래그 색 선택(배경/바). 메인 메뉴의 Bar 버튼으로 엽니다.",
   "dependencies": {
     "geode.node-ids": ">=v1.22.0"
   },
+  "resources": {
+    "sprites": [
+      "resources/studio-button.png"
+    ]
+  },
   "settings": {
-    "style": {
-      "type": "string",
-      "name": "바 스타일",
-      "description": "Vanilla = 기본 바 유지, Gradient / Modern = 모드 내장 바 (레벨 재입장 시 적용)",
-      "default": "Modern",
-      "one-of": [
-        "Vanilla",
-        "Gradient",
-        "Modern"
-      ]
-    },
-    "color-2": {
-      "type": "rgb",
-      "name": "보조 색상",
-      "description": "Gradient의 끝 색 / Modern의 끝부분 글로우 색",
-      "default": [
-        180,
-        120,
-        255
-      ]
+    "enabled": {
+      "type": "bool",
+      "name": "커스텀 프로그래스 바 사용",
+      "description": "끄면 기본 프로그래스 바가 그대로 표시됩니다 (레벨 재입장 시 적용)",
+      "default": true
     },
     "bar-width": {
       "type": "float",

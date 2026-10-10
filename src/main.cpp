@@ -7,23 +7,38 @@
 using namespace geode::prelude;
 
 // ---------------------------------------------------------------
-// 메인 메뉴 하단에 Studio 열기 버튼 추가
+// 메인 메뉴 하단에 Studio 열기 버튼 추가 (전용 이미지 사용)
 // ---------------------------------------------------------------
 class $modify(StudioMenuLayer, MenuLayer) {
     bool init() {
         if (!MenuLayer::init()) return false;
 
-        if (auto menu = this->getChildByID("bottom-menu")) {
+        auto menu = this->getChildByID("bottom-menu");
+        if (!menu) {
+            log::warn("bottom-menu 노드를 찾지 못해 Studio 버튼을 추가하지 못했습니다");
+            return true;
+        }
+
+        CCNode* icon = nullptr;
+        if (auto spr = CCSprite::create("studio-button.png"_spr)) {
+            // 이미지 크기에 상관없이 한 변이 약 50이 되도록 맞춤
+            auto size = spr->getContentSize();
+            float m = std::max(size.width, size.height);
+            if (m > 0.f) spr->setScale(50.f / m);
+            icon = spr;
+        } else {
+            // 이미지를 못 불러오면 글자 버튼으로 대체
             auto label = CCLabelBMFont::create("Bar", "bigFont.fnt");
             label->setScale(0.8f);
-            auto spr = CircleButtonSprite::create(label);
-            auto btn = CCMenuItemSpriteExtra::create(
-                spr, this, menu_selector(StudioMenuLayer::onStudio)
-            );
-            btn->setID("studio-button"_spr);
-            menu->addChild(btn);
-            menu->updateLayout();
+            icon = CircleButtonSprite::create(label);
         }
+
+        auto btn = CCMenuItemSpriteExtra::create(
+            icon, this, menu_selector(StudioMenuLayer::onStudio)
+        );
+        btn->setID("studio-button"_spr);
+        menu->addChild(btn);
+        menu->updateLayout();
         return true;
     }
 
@@ -33,23 +48,21 @@ class $modify(StudioMenuLayer, MenuLayer) {
 };
 
 // ---------------------------------------------------------------
-// 인게임 프로그래스 바
+// 인게임 프로그래스 바 (기본형 하나)
 // ---------------------------------------------------------------
 class $modify(BarPlayLayer, PlayLayer) {
     struct Fields {
-        std::string style;
         bool showPercent = true;
-        bool barEnabled = true;   // 유저가 GD에서 프로그래스 바를 켜뒀는지
         float width = 240.f;
         float height = 8.f;
         float last = -1.f;
-        ccColor3B color1 = { 90, 200, 255 };   // 바 색 (Studio에서 선택한 프리셋)
-        ccColor3B track = { 66, 72, 88 };      // 배경 색 (Studio에서 선택한 프리셋)
-        ccColor3B color2 = { 180, 120, 255 };  // 보조 색 (모드 설정)
+        ccColor3B barColor = { 255, 255, 255 };
+        ccColor3B trackColor = { 66, 72, 88 };
 
+        CCNode* origBar = nullptr;     // 게임 기본 바
+        CCNode* origLabel = nullptr;   // 게임 기본 퍼센트 라벨
         CCNode* root = nullptr;
-        CCDrawNode* draw = nullptr;          // Modern
-        CCLayerGradient* fill = nullptr;     // Gradient
+        CCDrawNode* draw = nullptr;
         CCLabelBMFont* label = nullptr;
     };
 
@@ -57,34 +70,47 @@ class $modify(BarPlayLayer, PlayLayer) {
         PlayLayer::setupHasCompleted();
 
         auto mod = Mod::get();
+        if (!mod->getSettingValue<bool>("enabled")) return;
+
         auto f = m_fields.self();
 
-        f->style = mod->getSettingValue<std::string>("style");
-        if (f->style == "Vanilla") return;
-
-        auto bar = this->getChildByID("progress-bar");
-        if (!bar) return;
-
         int sel = studio::selected();
-        f->color1 = studio::barColor(sel);
-        f->track = studio::trackColor(sel);
-        f->color2 = mod->getSettingValue<ccColor3B>("color-2");
+        f->barColor = studio::barColor(sel);
+        f->trackColor = studio::trackColor(sel);
         f->width = static_cast<float>(mod->getSettingValue<double>("bar-width"));
         f->height = static_cast<float>(mod->getSettingValue<double>("bar-height"));
         f->showPercent = mod->getSettingValue<bool>("show-percent");
-        f->barEnabled = bar->isVisible(); // GD 자체 설정을 존중
+
+        // 자식 깊이와 상관없이 기본 바/라벨을 찾는다
+        f->origBar = this->getChildByIDRecursive("progress-bar");
+        f->origLabel = this->getChildByIDRecursive("percentage-label");
+
+        CCNode* parent = this;
+        CCPoint pos;
+        int z = 100;
+
+        if (f->origBar && f->origBar->getParent()) {
+            // 기본 바와 같은 부모, 같은 위치
+            parent = f->origBar->getParent();
+            pos = f->origBar->getPosition();
+            z = f->origBar->getZOrder();
+        } else {
+            // 못 찾으면 화면 상단 중앙에 직접 표시
+            log::warn("progress-bar 노드를 찾지 못해 화면 상단 중앙에 표시합니다");
+            auto ws = CCDirector::get()->getWinSize();
+            pos = { ws.width / 2.f, ws.height - 14.f };
+        }
 
         auto root = CCNode::create();
         root->setID("custom-bar-root"_spr);
         root->setContentSize({ f->width, f->height });
         root->setAnchorPoint({ 0.5f, 0.5f });
-        root->setPosition(bar->getPosition());
-        root->setVisible(f->barEnabled);
-        bar->getParent()->addChild(root, bar->getZOrder());
+        root->setPosition(pos);
+        parent->addChild(root, z);
         f->root = root;
 
-        if (f->style == "Gradient") buildGradient();
-        else buildModern();
+        f->draw = CCDrawNode::create();
+        root->addChild(f->draw, 1);
 
         if (f->showPercent) {
             auto label = CCLabelBMFont::create("0%", "bigFont.fnt");
@@ -98,57 +124,16 @@ class $modify(BarPlayLayer, PlayLayer) {
         refresh(0.f);
     }
 
-    // ---- 내장 바 1: Gradient ----
-    void buildGradient() {
-        auto f = m_fields.self();
-        float w = f->width, h = f->height;
-
-        auto border = CCLayerColor::create({ 0, 0, 0, 160 }, w + 4.f, h + 4.f);
-        border->setPosition({ -2.f, -2.f });
-        f->root->addChild(border, 0);
-
-        auto bg = CCLayerColor::create(
-            ccc4(f->track.r, f->track.g, f->track.b, 220), w, h
-        );
-        f->root->addChild(bg, 1);
-
-        auto fill = CCLayerGradient::create(
-            ccc4(f->color1.r, f->color1.g, f->color1.b, 255),
-            ccc4(f->color2.r, f->color2.g, f->color2.b, 255)
-        );
-        fill->setVector({ 1.f, 0.f }); // 좌 → 우 그라데이션
-        fill->setContentSize({ 0.f, h });
-        f->root->addChild(fill, 2);
-        f->fill = fill;
-    }
-
-    // ---- 내장 바 2: Modern ----
-    void buildModern() {
-        auto f = m_fields.self();
-        auto draw = CCDrawNode::create();
-        f->root->addChild(draw, 1);
-        f->draw = draw;
-    }
-
     void refresh(float pct) {
         auto f = m_fields.self();
         float w = f->width, h = f->height;
-        float fillW = w * pct / 100.f;
 
-        if (f->fill) {
-            f->fill->setContentSize({ fillW, h });
-        }
-
-        if (f->draw) {
-            f->draw->clear();
-            studio::drawPill(f->draw, w, h, studio::toF(f->track, 0.85f)); // 트랙
-            if (pct > 0.f) {
-                float fw = std::max(fillW, h);
-                studio::drawPill(f->draw, fw, h, studio::toF(f->color1));  // 채움
-                float x = fw - h / 2.f;                                    // 끝부분 글로우
-                f->draw->drawDot({ x, h / 2.f }, h * 1.1f, studio::toF(f->color2, 0.30f));
-                f->draw->drawDot({ x, h / 2.f }, h * 0.55f, { 1.f, 1.f, 1.f, 1.f });
-            }
+        f->draw->clear();
+        // 배경(트랙)
+        studio::drawPill(f->draw, w, h, studio::toF(f->trackColor));
+        // 채워진 부분
+        if (pct > 0.f) {
+            studio::drawPill(f->draw, std::max(w * pct / 100.f, h), h, studio::toF(f->barColor));
         }
 
         if (f->label) {
@@ -162,9 +147,15 @@ class $modify(BarPlayLayer, PlayLayer) {
         auto f = m_fields.self();
         if (!f->root) return;
 
-        // 원본 바/퍼센트 라벨은 계속 숨김 (게임이 다시 켜는 경우 대비)
-        if (auto bar = this->getChildByID("progress-bar")) bar->setVisible(false);
-        if (auto lbl = this->getChildByID("percentage-label")) lbl->setVisible(false);
+        // 기본 바는 보이지 않게만 만들고(scale), 게임의 visible 설정은 그대로 읽어서
+        // "Show Progress Bar" 옵션을 따라간다.
+        if (f->origBar) {
+            f->root->setVisible(f->origBar->isVisible());
+            if (f->origBar->getScale() > 0.001f) f->origBar->setScale(0.0001f);
+        }
+        if (f->origLabel && f->origLabel->getScale() > 0.001f) {
+            f->origLabel->setScale(0.0001f);
+        }
 
         float pct = std::clamp(static_cast<float>(this->getCurrentPercent()), 0.f, 100.f);
         if (std::abs(pct - f->last) < 0.01f) return;
