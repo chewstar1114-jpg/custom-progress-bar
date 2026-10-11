@@ -98,7 +98,7 @@ class $modify(BarPlayLayer, PlayLayer) {
             // 못 찾으면 화면 상단 중앙에 직접 표시
             log::warn("progress-bar 노드를 찾지 못해 화면 상단 중앙에 표시합니다");
             auto ws = CCDirector::get()->getWinSize();
-            pos = { ws.width / 2.f, ws.height - 14.f };
+            pos = ccp(ws.width / 2.f, ws.height - 14.f);
         }
 
         auto root = CCNode::create();
